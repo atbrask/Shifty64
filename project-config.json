@@ -1,0 +1,13 @@
+{
+    "name": "Shifty64",
+    "description": "Project Shifty64",
+    "toolkit": "acme",
+    "sources": [
+        "src/shifty.asm"
+    ],
+    "build": "debug",
+    "definitions": [],
+    "includes": [],
+    "args": [],
+    "compiler": ""
+}
