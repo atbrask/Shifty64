@@ -101,8 +101,6 @@ def main():
     for name, rows in levels:
         out.append(";-------------------------------------------------------------------------------")
         out.append(f"{name}:")
-        out.append(";-------------------------------------------------------------------------------")
-        out.append("; TileData:")
 
         compressed_bytes = []
         px, py = None, None
@@ -119,9 +117,9 @@ def main():
                 compressed_bytes.append(packed_byte)
 
 
-        # Traverse row major
-        for y in range(8):
-            for x in range(24):
+        # Traverse Column-Major (x outer, y inner)
+        for x in range(24):
+            for y in range(8):
                 char = rows[y][x]
                 if char not in mappings:
                     raise ValueError(f"Unknown char '{char}' in level '{name}'")
@@ -151,19 +149,10 @@ def main():
         for j in range(0, len(compressed_bytes), 12):
             chunk = compressed_bytes[j:j+12]
             out.append("    !byte " + ", ".join(f"${b:02x}" for b in chunk))
+        out.append("")
 
         if px is None or py is None:
             raise ValueError(f"Player is missing from level {name}")
-
-        player_pos_packed = (px << 3) | py
-
-        out.append("")
-        if px is not None:
-            out.append(f"; PlayerPos:\n    !word ${player_pos_packed:04x}")
-            out.append("")
-
-        out.append(f"; NumGoals:\n    !byte {num_goals}")
-        out.append("")
 
     # Write to disk
     args.output.write_text("\n".join(out), encoding="utf-8")

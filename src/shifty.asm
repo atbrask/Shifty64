@@ -256,7 +256,7 @@ nextTile:
         lda ($f9), y
         and #%00001111
         sta $02
-        stx $03
+        stx $04
         jsr drawTile
 
         ; Clear redraw flag
@@ -268,9 +268,9 @@ drawContinue:
         inx
         iny
 
-        cpx #24
+        cpx #08
         bne nextTile
-        inc $04
+        inc $03
         cpy #$c0
         bne nextRow
 done:
