@@ -137,6 +137,12 @@ removeGoal:
 readInput:
         ; TODO filter input before returning
         jsr KERNAL_READ_KEY
+        beq noInput
+        clc
+        rts
+noInput:
+        lda #00
+        sec
         rts
 
 
