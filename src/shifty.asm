@@ -55,19 +55,48 @@ gameTitle:
 
 gameStart:
         jsr readInput
-        beq gameStart
+        bcs gameStart
 
         jsr gameInit
 
 gameLoop:
+        ; TODO Handle exit to title
+
         jsr readInput
-        beq gameLoop
+        bcs gameLoop
 
         jsr playerMove
-        beq gameLoop
+        bcs gameLoop
 
         jsr draw
         jmp gameLoop
+
+;------------------------------------------------------------------------------
+; tryGetNeighborAddress: Given a tile address in A and a direction in X, returns the address of the neighboring tile in A. Returns with carry set if the neighbor is vertical (up or down), clear if horizontal (left or right). Returns with carry clear if the neighbor is out of bounds.
+;------------------------------------------------------------------------------
+tryGetNeighborAddress:
+        ror
+        bcs verticalNeighbor
+
+horizontalNeighbor:
+        ror
+        bcs leftNeighbor
+
+rightNeighbor:
+        rts
+
+leftNeighbor:
+        rts
+
+verticalNeighbor:
+
+upNeighbor:
+
+        rts
+
+downNeighbor:
+
+        rts
 
 playerMove:
         ; TODO
@@ -189,6 +218,11 @@ gameInit:
         jsr draw
         rts
 
+;------------------------------------------------------------------------------
+; draw: Draws the current level to the screen buffer
+; Uses zp $02..$04, $f9..$fa
+; Clobbers A, X, Y
+;------------------------------------------------------------------------------
 draw:
         ; Level pointer
         lda #<level
@@ -236,6 +270,10 @@ drawContinue:
 done:
         rts
 
+;------------------------------------------------------------------------------
+; prepareScreen: Sets up the VIC-II for bitmap mode, clears the screen and 
+; color RAM, and sets the background colors.
+;------------------------------------------------------------------------------
 prepareScreen:
         ; Set border and background
         lda #$0e
@@ -307,9 +345,12 @@ setDisplayBackground:
 
         rts ; return prepareScreen
 
+;------------------------------------------------------------------------------
+; showTitle: Copies the splash screen to the bitmap display area
+; Uses zp $fb..fe
+; Clobbers A, X, Y
+;------------------------------------------------------------------------------
 showTitle:
-        ; Copy splash to screen RAM
-
         ; Set source pointer
         lda #<splash
         sta $fb
@@ -359,8 +400,11 @@ copyBytes:
 
         rts ; return showTitle
 
-; Draws tile with index $02 at x = $03, y = $04
+;------------------------------------------------------------------------------
+; drawTile: Draws tile with index $02 at x = $03, y = $04
 ; Uses zp $fb..ff
+; Preserves A, X, Y
+;------------------------------------------------------------------------------
 drawTile:
         ; --- SAVE REGISTERS TO STACK ---
         pha         ; Save Accumulator
