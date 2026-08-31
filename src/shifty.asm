@@ -19,12 +19,12 @@ COLOR_BUFFER      = $0400
 KERNAL_READ_KEY   = $ffe4
 
 ; Key codes
-KEY_QUIT_TO_TITLE = $D1 ; Q
+KEY_QUIT_TO_TITLE = $51 ; Q
 KEY_RESTART_LEVEL = $0D ; Return
-KEY_UP            = $D7 ; W
-KEY_LEFT          = $C1 ; A
-KEY_DOWN          = $D3 ; S
-KEY_RIGHT         = $C4 ; D
+KEY_UP            = $57 ; W
+KEY_LEFT          = $41 ; A
+KEY_DOWN          = $53 ; S
+KEY_RIGHT         = $44 ; D
 
 ;
 ; How tiles are stored in the loaded level:
@@ -32,7 +32,7 @@ KEY_RIGHT         = $C4 ; D
 PushableMask      = 0b10000000 ; bit 7 of tile
 NeedsRedrawMask   = 0b01000000 ; bit 6 of tile
 ActiveTileMask    = 0b00100000 ; bit 5 of tile
-TileIndexMask     = 0b00011111 ; bits 0-4 of tile
+TileIndexMask     = 0b00011111 ; bits 0-4 of tile (This port assumes a max of 16 tile types due to memory layout)
 
 ; Direction encoding:
 ; bit 0: Axis (0: X, 1: Y)
@@ -63,7 +63,8 @@ gameLoop:
         jsr readInput
         bcs gameLoop
 
-        ; TODO Handle exit to title
+        cpy #KEY_QUIT_TO_TITLE
+        beq gameTitle
 
         jsr playerMove
         bcs gameLoop
@@ -213,7 +214,7 @@ writeRun:
         rts
 
 gameInit:
-        lda #$00
+        lda #$07
         sta CurrentLevelIndex
         jsr gotoLevel
         jsr draw
