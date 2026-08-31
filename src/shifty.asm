@@ -413,14 +413,10 @@ drawTile:
         tya
         pha         ; Save Y register
 
-        ;lda #0
-        ;sta $f8
-        ;sta $f9
-
         ; Pick out active flag
-        ;lda $02
-        ;and #ActiveTileMask
-        ;sta $fa
+        lda $02
+        and #ActiveTileMask
+        sta $fa
 
         ; Set source pointer (tile index + bit shift)
         clc
@@ -472,38 +468,44 @@ drawTile:
         tax
 
         ; Mask out first 8x8 box and draw partial tile
-        ;lda maskLeft, X
-        ;sta $f8
-        ;lda activeMaskLeft, X
-        ;sta $f9
+        lda maskLeft, X
+        sta $f8
+        lda $fa
+        bne +
+        lda #0
+        jmp ++
++       lda activeMaskLeft, X
+++      sta $f9
 
-        ldy #$00
--       lda ($fd),Y
-        ;and $f8
-        and maskLeft, X
-        ora ($fb),Y
-        ;eor $f9
-        sta ($fd),Y
-        iny
-        cpy #$08
-        bcc -
+        ldy #$00    ; Initialize Y to 0 for the first byte of the 8x8 box
+-       lda ($fd),Y ; Load byte from screen buffer
+        and $f8     ; Mask out bits for first 8x8 box
+        ora ($fb),Y ; Load byte from tile data and OR it in
+        eor $f9     ; XOR with active mask to invert bits if active
+        sta ($fd),Y ; Store byte back to screen buffer
+        iny         ; Increment Y to move to next byte in the 8x8 box
+        cpy #$08    ; Check if we've processed all 8 bytes of the 8x8 box
+        bcc -       ; Loop back if not done
 
         ; Mask out second 8x8 box and draw partial tile
-        ;lda maskRight, X
-        ;sta $f8
-        ;lda activeMaskRight, X
-       ; sta $f9
+        lda maskRight, X
+        sta $f8
+        lda $fa
+        bne +
+        lda #0
+        jmp ++
++       lda activeMaskRight, X
+++      sta $f9
 
-        ldy #$08
--       lda ($fd),y
-        ;and $f8
-        and maskRight, X
-        ora ($fb),Y
-        ;eor $f9
-        sta ($fd),Y
-        iny
-        cpy #$10
-        bcc -
+        ldy #$08    ; Initialize Y to 8 for the first byte of the second 8x8 box
+-       lda ($fd),y ; Load byte from screen buffer
+        and $f8     ; Mask out bits for second 8x8 box
+        ora ($fb),Y ; Load byte from tile data and OR it in
+        eor $f9     ; XOR with active mask to invert bits if active
+        sta ($fd),Y ; Store byte back to screen buffer
+        iny         ; Increment Y to move to next byte in the second 8x8 box
+        cpy #$10    ; Check if we've processed all 8 bytes of the second 8x8 box
+        bcc -       ; Loop back if not done
 
         ; --- RESTORE REGISTERS FROM STACK ---
         pla
