@@ -60,10 +60,10 @@ gameStart:
         jsr gameInit
 
 gameLoop:
-        ; TODO Handle exit to title
-
         jsr readInput
         bcs gameLoop
+
+        ; TODO Handle exit to title
 
         jsr playerMove
         bcs gameLoop
@@ -157,9 +157,9 @@ gotoLevel:
         sta $fc
 
         ; Level pointer
-        lda #<level
+        lda #<Level
         sta $f9
-        lda #>level
+        lda #>Level
         sta $fa
 
         ; Input and output offsets
@@ -209,12 +209,7 @@ writeRun:
         ; Check if done
         cmp #$c0
         bcc readCompressed
-
-        ; Set player starting position
-        ; TODO
-
-        ; Load number of targets in level
-        ; TODO
+        ; TODO Call InitLevelVariables and undo init
         rts
 
 gameInit:
@@ -226,15 +221,15 @@ gameInit:
 
 ;------------------------------------------------------------------------------
 ; draw: Draws the current level to the screen buffer
-; Uses zp $02..$04, $f9..$fa
+; Uses zp $02..$04, $f6..$f7
 ; Clobbers A, X, Y
 ;------------------------------------------------------------------------------
 draw:
         ; Level pointer
-        lda #<level
-        sta $f9
-        lda #>level
-        sta $fa
+        lda #<Level
+        sta $a6
+        lda #>Level
+        sta $a7
 
         ; level offset
         ldy #00
@@ -245,7 +240,7 @@ nextRow:
         ldx #00
 nextTile:
         ; Check dirty flag
-        lda ($f9),y
+        lda ($a6),y
         and #NeedsRedrawMask
         beq drawContinue
 
@@ -253,16 +248,15 @@ nextTile:
         ; TODO
 
         ; Draw tile
-        lda ($f9), y
-        and #%00001111
+        lda ($a6), y
         sta $02
         stx $04
         jsr drawTile
 
         ; Clear redraw flag
-        lda ($f9),y
+        lda ($a6),y
         eor #NeedsRedrawMask
-        sta ($f9),y
+        sta ($a6),y
 
 drawContinue:
         inx
@@ -408,7 +402,7 @@ copyBytes:
 
 ;------------------------------------------------------------------------------
 ; drawTile: Draws tile with index $02 at x = $03, y = $04
-; Uses zp $fb..ff
+; Uses zp $f8..ff
 ; Preserves A, X, Y
 ;------------------------------------------------------------------------------
 drawTile:
@@ -418,6 +412,15 @@ drawTile:
         pha         ; Save X register
         tya
         pha         ; Save Y register
+
+        ;lda #0
+        ;sta $f8
+        ;sta $f9
+
+        ; Pick out active flag
+        ;lda $02
+        ;and #ActiveTileMask
+        ;sta $fa
 
         ; Set source pointer (tile index + bit shift)
         clc
@@ -469,20 +472,34 @@ drawTile:
         tax
 
         ; Mask out first 8x8 box and draw partial tile
+        ;lda maskLeft, X
+        ;sta $f8
+        ;lda activeMaskLeft, X
+        ;sta $f9
+
         ldy #$00
 -       lda ($fd),Y
+        ;and $f8
         and maskLeft, X
         ora ($fb),Y
+        ;eor $f9
         sta ($fd),Y
         iny
         cpy #$08
         bcc -
 
         ; Mask out second 8x8 box and draw partial tile
+        ;lda maskRight, X
+        ;sta $f8
+        ;lda activeMaskRight, X
+       ; sta $f9
+
         ldy #$08
 -       lda ($fd),y
+        ;and $f8
         and maskRight, X
         ora ($fb),Y
+        ;eor $f9
         sta ($fd),Y
         iny
         cpy #$10
@@ -505,8 +522,14 @@ tileCells:
 maskLeft:
         !byte $00, $c0, $f0, $fc
 
+activeMaskLeft:
+        !byte $ff, $3f, $0f, $03
+
 maskRight:
         !byte $3f, $0f, $03, $00
+
+activeMaskRight:
+        !byte $c0, $f0, $fc, $ff
 
 ;=======================================
 ; Splash screen
@@ -535,10 +558,16 @@ MissingTargets: !byte 0
 
 CurrentLevelIndex: !byte 0
 
-level:
-        !byte $00
+; buffers
+Level = (CurrentLevelIndex + $ff) & $ff00
+LevelEnd = Level + 8*24
+
+UndoEntryCount = Level + $0100 - 2
+UndoBufferAt = Level + $0100 - 1
+Undobuffer = Level + $0100
+UndoBufferEnd = Undobuffer + $0100
 
 ; Assert that the buffer fits before the VIC-II screen area
-!if level + 2048 > $A000 {
+!if UndoBufferEnd > $A000 {
     !error "Out of memory"
 }
