@@ -20,7 +20,8 @@ KERNAL_READ_KEY   = $ffe4
 
 ; Key codes
 KEY_QUIT_TO_TITLE = $51 ; Q
-KEY_RESTART_LEVEL = $0D ; Return
+KEY_RESTART_LEVEL = $52 ; R
+KEY_UNDO          = $5a ; Z
 KEY_UP            = $57 ; W
 KEY_LEFT          = $41 ; A
 KEY_DOWN          = $53 ; S
@@ -47,8 +48,13 @@ DirectionDown     = 0b00000011
 !cpu 6502
 *=$0801   ; Starting Address
 
+; BASIC stub to start the game
 !byte $0C,$08,$40,$00,$9E,$20,$32,$30,$36,$32,$00,$00,$00 ; BASIC CODE: 1024 SYS 2062	
 
+;--------------------------------------------------------------------------------
+; Main program loop
+;--------------------------------------------------------------------------------
+        cld
         jsr prepareScreen
 gameTitle:
         jsr showTitle
@@ -73,9 +79,13 @@ gameLoop:
         jmp gameLoop
 
 ;------------------------------------------------------------------------------
-; tryGetNeighborAddress: Given a tile address in A and a direction in X, returns the address of the neighboring tile in A. Returns with carry set if the neighbor is vertical (up or down), clear if horizontal (left or right). Returns with carry clear if the neighbor is out of bounds.
+; tryGetNeighborAddress: Expects a tile offset in A and a direction in X.
+; Returns the offset of the neighboring tile in A.
+; Sets carry if the neighbor is out of bounds.
 ;------------------------------------------------------------------------------
 tryGetNeighborAddress:
+        pha
+        txa
         ror
         bcs verticalNeighbor
 
@@ -84,42 +94,188 @@ horizontalNeighbor:
         bcs leftNeighbor
 
 rightNeighbor:
+        pla
+        clc
+        adc #$08
+        cmp #$c0
         rts
 
 leftNeighbor:
+        pla
+        sec
+        sbc #$08
+        bcc +
+        clc
+        rts
++       sec
         rts
 
 verticalNeighbor:
+        ror
+        bcs downNeighbor
 
 upNeighbor:
-
+        pla
+        sec
+        sbc #$01
+        pha
+        and #$07
+        cmp #$07
+        beq +
+        pla
+        clc
+        rts
++       pla
+        sec
         rts
 
 downNeighbor:
-
+        pla
+        clc
+        adc #01
+        pha
+        and #$07
+        beq +
+        pla
+        clc
+        rts
++       pla
+        sec
         rts
 
+;------------------------------------------------------------------------------
+; playerMove: Moves the player in the direction specified in X.
+; PlayerMoveDir = Direction (0 -> right, 1 -> up, 2 -> right, 3 -> down)
+; This procedure pushes the pushable positions to the stack
+; -> [A] = the number of positions pushed to the stack
+;------------------------------------------------------------------------------
 playerMove:
-        ; TODO
-        rts
+        ; Push the player position onto the stack
+        lda PlayerPos
+        pha
+
+        ; Initial position count
+        lda #$01
+        sta $02
 
 moveSearchLoop:
-        ; TODO
-        rts
+        lda PlayerPos
+        ldx PlayerMoveDir
+        jsr tryGetNeighborAddress
+        bcs moveFoundSolid ; handle out of bounds as solid
+
+        ldy PlayerPos
+        lda Level, y
+
+        cmp #PushableMask
+        bcs moveFoundPushable
+
+        and #TileIndexMask
+
+        ; Check for solid tiles
+        cmp #TileWallBrick_Index
+        beq moveFoundSolid
+
+        cmp #TileDoorClosed_Index
+        beq moveFoundSolid
+
+        cmp #TileDoorOpen_Index
+        beq moveFoundOpenDoor
+
+        ; Check for hole
+        cmp #TileHole_Index
+        beq moveFoundHole
+
+        ; Block the move if search has looped around and is trying to push into current player position
+        eor #TileBoxKidRight_Index
+        cmp #$04
+        bcc moveFoundSolid
+
+        ; Assume we found empty
+        jmp movePerform
 
 moveFoundOpenDoor:
-        ; TODO
+        lda $02 ; Read the number of positions pushed to the stack
+        cmp #$01
+        bne moveFoundSolid ; If we have more than one position, treat as solid
+
+        ; TODO(jkk): What if we have the following?
+	; ..###    ..###
+	; .@>D# or ..#D#
+	; ..###    ..@^#
+
+        ; Go through the open door
+        pla
+        inc CurrentLevelIndex
+        lda CurrentLevelIndex
+        jsr gotoLevel
+        clc
         rts
 
 moveFoundHole:
+	; First we must find the head pushable tile.
+	; Because the train of pushables could have turns signified by 0xFF sentinels,
+	; we need to keep popping the stack as long as the top is a 0xFF turn sentinel.
+
+skipDirectionChangeSentinelsLoop:
+        ; We need to follow the arrows
+        pla
+        dec $02
+        beq setCarryAndReturn
+        cmp #$ff
+        beq skipDirectionChangeSentinelsLoop
+        
+        ; Now we are on the first non-direction change tile
+	; If it is pushable, it should go in the hole
+
+        tay
+        lda Level, y
+        cmp #PushableMask
+        bcc moveCancel; If it is not pushable, we cannot move into the hole
+
+        ; Head was a pushable, so it should go in the hole (remove both)
+
+	; Test if head was a goal
+        and #TileIndexMask
+        cmp #TileGoal_Index
+        beq removeGoal
+
         ; TODO
-        rts
+        jsr undoSaveTile
+        ;TODO xchg
+        jsr undoSaveTile
+        lda #(TileEmpty_Index | NeedsRedrawMask)
+        sta Level, y
+        jmp movePerform
 
 moveFoundPushable:
-        ; TODO
-        rts
+        ; it's a pushable, so push it (^;
+	pha
+	inc $02 ; increment position count
+	jmp moveSearchLoop
 
 moveFoundSolid:
+        ; Go backwards through the stack and find the first arrow pointing
+	; at a right angle to the current direction of movement.
+	; If such a perpendicular arrow is found:
+	; return from here and continue searching for solids from that arrow in the direction dictated by that arrow.
+	;
+	; i.e. the arrow changes the direction of search
+	;
+	; If during this search we get all the way back to the player, the move can't be performed.
+	;
+perpArrowSearchLoop:
+        pla
+        dec $02
+        beq setCarryAndReturn
+
+        ; We must check if this is a real position or a search direction change
+        cmp #$ff
+        bne notDirectionChangeSentinel
+
+
+notDirectionChangeSentinel:
+notGoal:
         ; TODO
         rts
 
@@ -127,25 +283,57 @@ moveCancel:
         ; TODO
         rts
 
-movePerform:
-        ; TODO
-        rts
-
-removeGoal:
-        ; TODO
-        rts
-
-readInput:
-        ; TODO filter input before returning
-        jsr KERNAL_READ_KEY
-        beq noInput
-        clc
-        rts
-noInput:
-        lda #00
+setCarryAndReturn:
         sec
         rts
 
+movePerform:
+skipPlayerPosUpdate:
+tileDidntChange:
+decrementAndLoop:
+        ; TODO
+        rts
+
+undoEndMoveRecord:
+searchSentinel:
+foundSentinel:
+oldestRecordNotTruncated:
+        ; TODO
+        rts
+
+; A = tile offset
+; Clobbers y
+undoSaveTile:
+        ; preserve A
+        pha
+    
+        ; save tile offset
+        ldy UndoBufferAt
+        sta UndoBuffer, y
+        iny
+        sty UndoBufferAt
+
+        ; save tile value
+        tay
+        lda Level, y
+        ldy UndoBufferAt
+        sta UndoBuffer, y
+        iny
+        sty UndoBufferAt
+
+        ; Update the count of entries in the undo buffer
+        inc UndoEntryCount
+
+        ; restore A and return
+        pla
+        rts
+
+removeGoal:
+openDoorsLoop:
+notClosedDoor:
+end:
+        ; TODO
+        rts
 
         ;Level index in A
 gotoLevel:
@@ -211,10 +399,40 @@ writeRun:
         cmp #$c0
         bcc readCompressed
         ; TODO Call InitLevelVariables and undo init
+
+undoClear:
+loopUndoCLear:
+        ; TODO
+        rts
+
+initLeveLVariables:
+loopLevelVariables:
+notTarget:
+notThePlayer:
+endLevelVariables:
+        ; TODO
+        rts
+
+undo:
+undoLoop:
+undoEnd:
+        ; TODO
+        rts
+
+
+readInput:
+        ; TODO filter input before returning
+        jsr KERNAL_READ_KEY
+        beq noInput
+        clc
+        rts
+noInput:
+        lda #00
+        sec
         rts
 
 gameInit:
-        lda #$07
+        lda #$00
         sta CurrentLevelIndex
         jsr gotoLevel
         jsr draw
@@ -222,15 +440,14 @@ gameInit:
 
 ;------------------------------------------------------------------------------
 ; draw: Draws the current level to the screen buffer
-; Uses zp $02..$04, $f6..$f7
-; Clobbers A, X, Y
+; Uses zp $02..$05, $f6..$f7
 ;------------------------------------------------------------------------------
 draw:
         ; Level pointer
         lda #<Level
-        sta $a6
+        sta $e6
         lda #>Level
-        sta $a7
+        sta $e7
 
         ; level offset
         ldy #00
@@ -241,23 +458,22 @@ nextRow:
         ldx #00
 nextTile:
         ; Check dirty flag
-        lda ($a6),y
+        lda ($e6),y
         and #NeedsRedrawMask
         beq drawContinue
 
-        ; Check active flag
-        ; TODO
-
         ; Draw tile
-        lda ($a6), y
+        lda ($e6), y
         sta $02
         stx $04
+        sty $05
         jsr drawTile
-
+        ldx $04
+        ldy $05
         ; Clear redraw flag
-        lda ($a6),y
+        lda ($e6),y
         eor #NeedsRedrawMask
-        sta ($a6),y
+        sta ($e6),y
 
 drawContinue:
         inx
@@ -404,16 +620,8 @@ copyBytes:
 ;------------------------------------------------------------------------------
 ; drawTile: Draws tile with index $02 at x = $03, y = $04
 ; Uses zp $f8..ff
-; Preserves A, X, Y
 ;------------------------------------------------------------------------------
 drawTile:
-        ; --- SAVE REGISTERS TO STACK ---
-        pha         ; Save Accumulator
-        txa
-        pha         ; Save X register
-        tya
-        pha         ; Save Y register
-
         ; Pick out active flag
         lda $02
         and #ActiveTileMask
@@ -508,13 +716,6 @@ drawTile:
         cpy #$10    ; Check if we've processed all 8 bytes of the second 8x8 box
         bcc -       ; Loop back if not done
 
-        ; --- RESTORE REGISTERS FROM STACK ---
-        pla
-        tay         ; Restore Y register (must be pulled first)
-        pla
-        tax         ; Restore X register
-        pla         ; Restore Accumulator
-
         rts
 
 tileCells:
@@ -567,8 +768,8 @@ LevelEnd = Level + 8*24
 
 UndoEntryCount = Level + $0100 - 2
 UndoBufferAt = Level + $0100 - 1
-Undobuffer = Level + $0100
-UndoBufferEnd = Undobuffer + $0100
+UndoBuffer = Level + $0100
+UndoBufferEnd = UndoBuffer + $0100
 
 ; Assert that the buffer fits before the VIC-II screen area
 !if UndoBufferEnd > $A000 {
