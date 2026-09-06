@@ -440,15 +440,9 @@ gameInit:
 
 ;------------------------------------------------------------------------------
 ; draw: Draws the current level to the screen buffer
-; Uses zp $02..$05, $f6..$f7
+; Uses zp $02..$05
 ;------------------------------------------------------------------------------
 draw:
-        ; Level pointer
-        lda #<Level
-        sta $e6
-        lda #>Level
-        sta $e7
-
         ; level offset
         ldy #00
         sty $03
@@ -458,12 +452,12 @@ nextRow:
         ldx #00
 nextTile:
         ; Check dirty flag
-        lda ($e6),y
+        lda Level,y
         and #NeedsRedrawMask
         beq drawContinue
 
         ; Draw tile
-        lda ($e6), y
+        lda Level,y
         sta $02
         stx $04
         sty $05
@@ -471,9 +465,9 @@ nextTile:
         ldx $04
         ldy $05
         ; Clear redraw flag
-        lda ($e6),y
+        lda Level,y
         eor #NeedsRedrawMask
-        sta ($e6),y
+        sta Level,y
 
 drawContinue:
         inx
