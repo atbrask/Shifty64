@@ -33,6 +33,7 @@ KEY_RIGHT         = $44 ; D
 PushableMask      = 0b10000000 ; bit 7 of tile
 NeedsRedrawMask   = 0b01000000 ; bit 6 of tile
 ActiveTileMask    = 0b00100000 ; bit 5 of tile
+InactiveTileMask  = 0b11011111 ; bit 5 of tile
 TileIndexMask     = 0b00011111 ; bits 0-4 of tile (This port assumes a max of 16 tile types due to memory layout)
 
 ; Direction encoding:
@@ -148,10 +149,15 @@ downNeighbor:
 ; PlayerMoveDir = Direction (0 -> right, 1 -> up, 2 -> right, 3 -> down)
 ; This procedure pushes the pushable positions to the stack
 ; -> [A] = the number of positions pushed to the stack
+;
+; Uses zp $02 for the count of positions pushed to the stack
+;  and zp $03 for the HL position
+;  and zp $04 for the DE position
 ;------------------------------------------------------------------------------
 playerMove:
-        ; Push the player position onto the stack
+        ; Push the player's initial position onto the stack
         lda PlayerPos
+        sta $03
         pha
 
         ; Initial position count
@@ -159,12 +165,13 @@ playerMove:
         sta $02
 
 moveSearchLoop:
-        lda PlayerPos
+        lda $03
         ldx PlayerMoveDir
         jsr tryGetNeighborAddress
+        sta $03
         bcs moveFoundSolid ; handle out of bounds as solid
 
-        ldy PlayerPos
+        tay
         lda Level, y
 
         cmp #PushableMask
@@ -240,13 +247,22 @@ skipDirectionChangeSentinelsLoop:
         cmp #TileGoal_Index
         beq removeGoal
 
-        ; TODO
+        lda $03
         jsr undoSaveTile
-        ;TODO xchg
+        ; swaap HL and DE, ($03 is HL, $04 is DE)
+        ldx $04
+        lda $03
+        sta $04
+        txa
+        sta $03
         jsr undoSaveTile
         lda #(TileEmpty_Index | NeedsRedrawMask)
         sta Level, y
         jmp movePerform
+
+removeGoal:
+        ; TODO
+        rts
 
 moveFoundPushable:
         ; it's a pushable, so push it (^;
@@ -267,25 +283,76 @@ moveFoundSolid:
 perpArrowSearchLoop:
         pla
         dec $02
+        sta $03 ; update HL position to the popped value
         beq setCarryAndReturn
 
         ; We must check if this is a real position or a search direction change
         cmp #$ff
         bne notDirectionChangeSentinel
-
+        pla
+        dec $02
+        sta PlayerMoveDir ; update the direction of movement to the popped value
+        jmp perpArrowSearchLoop
 
 notDirectionChangeSentinel:
-notGoal:
-        ; TODO
-        rts
+        tay
+        lda Level, y
+        and #TileIndexMask
 
-moveCancel:
-        ; TODO
-        rts
+        ; Test for goal
+        cmp #TileGoal_Index
+        bne notGoal
+        jsr removeGoal
+        jmp movePerform
 
 setCarryAndReturn:
         sec
         rts
+
+notGoal:
+        eor #TileRightArrow_Index
+        cmp #$04
+        bcc perpArrowSearchLoop
+
+        ; At this point, it is an arrow
+        sta $05 ; $05 = Arrow direction
+        eor PlayerMoveDir
+        clc
+        ror
+        bcc perpArrowSearchLoop ; If the arrow is not perpendicular, continue searching
+
+        ; The found arrow is perpendicular
+        ldy $03
+        lda Level, y
+        ora ActiveTileMask | NeedsRedrawMask
+        sta Level, y
+
+        ; Push search direction and sentinel onto the stack
+        lda PlayerMoveDir
+        pha
+        inc $02
+        lda #$ff
+        pha
+        inc $02
+
+        lda $05
+        sta PlayerMoveDir ; update the direction of movement to the found arrow's direction
+
+        jmp moveSearchLoop
+
+moveCancel:
+      	; Cancel the move, since we found a solid
+        ; Unwind the stack
+        ldy $03
+        lda Level, y
+        and InactiveTileMask
+        ora NeedsRedrawMask
+        sta Level, y
+
+        pla
+        dec $02
+        bne moveCancel
+        jmp setCarryAndReturn
 
 movePerform:
 skipPlayerPosUpdate:
@@ -328,7 +395,7 @@ undoSaveTile:
         pla
         rts
 
-removeGoal:
+
 openDoorsLoop:
 notClosedDoor:
 end:
