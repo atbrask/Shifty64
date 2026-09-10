@@ -488,9 +488,51 @@ undoEnd:
 
 
 readInput:
-        ; TODO filter input before returning
         jsr KERNAL_READ_KEY
+
+        ; No input, return with carry set
         beq noInput
+
+        cmp #KEY_RESTART_LEVEL
+        bne notRestart
+        lda CurrentLevelIndex
+        jsr gotoLevel
+        jsr draw
+        sec
+        rts
+notRestart:
+        cmp #KEY_QUIT_TO_TITLE
+        bne notQuit
+        jmp gameTitle
+notQuit:
+        cmp #KEY_UNDO
+        bne notUndo
+        jsr undo
+        jsr draw
+        sec
+        rts
+notUndo:
+        cmp #KEY_UP
+        bne notUp
+        lda #DirectionUp
+        clc
+        rts
+notUp:
+        cmp #KEY_DOWN
+        bne notDown
+        lda #DirectionDown
+        clc
+        rts
+notDown:
+        cmp #KEY_LEFT
+        bne notLeft
+        lda #DirectionLeft
+        clc
+        rts
+notLeft:
+        cmp #KEY_RIGHT
+        bne noInput
+        lda #DirectionRight
         clc
         rts
 noInput:
