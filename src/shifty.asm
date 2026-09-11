@@ -70,9 +70,6 @@ gameLoop:
         jsr readInput
         bcs gameLoop
 
-        cpy #KEY_QUIT_TO_TITLE
-        beq gameTitle
-
         jsr playerMove
         bcs gameLoop
 
@@ -149,31 +146,27 @@ downNeighbor:
 ; PlayerMoveDir = Direction (0 -> right, 1 -> up, 2 -> right, 3 -> down)
 ; This procedure pushes the pushable positions to the stack
 ; -> [A] = the number of positions pushed to the stack
-;
-; Uses zp $02 for the count of positions pushed to the stack
-;  and zp $03 for the HL position
-;  and zp $04 for the DE position
 ;------------------------------------------------------------------------------
 playerMove:
         ; Push the player's initial position onto the stack
         lda PlayerPos
-        sta $03
+        sta CurrentTile
         pha
-
-        ; Initial position count
         lda #$01
-        sta $02
+        sta StackDepth
 
 moveSearchLoop:
-        lda $03
+        lda CurrentTile
         ldx PlayerMoveDir
         jsr tryGetNeighborAddress
-        sta $03
-        bcs moveFoundSolid ; handle out of bounds as solid
+        sta CurrentTile
+        bcc +
+        jmp moveFoundSolid ; handle out of bounds as solid
 
-        tay
++       tay
         lda Level, y
 
+        ; Check if the tile is pushable
         cmp #PushableMask
         bcs moveFoundPushable
 
@@ -202,7 +195,7 @@ moveSearchLoop:
         jmp movePerform
 
 moveFoundOpenDoor:
-        lda $02 ; Read the number of positions pushed to the stack
+        lda StackDepth
         cmp #$01
         bne moveFoundSolid ; If we have more than one position, treat as solid
 
@@ -227,9 +220,10 @@ moveFoundHole:
 skipDirectionChangeSentinelsLoop:
         ; We need to follow the arrows
         pla
-        dec $02
-        beq setCarryAndReturn
-        cmp #$ff
+        dec StackDepth
+        bne +
+        jmp setCarryAndReturn
++       cmp #$ff
         beq skipDirectionChangeSentinelsLoop
         
         ; Now we are on the first non-direction change tile
@@ -238,36 +232,36 @@ skipDirectionChangeSentinelsLoop:
         tay
         lda Level, y
         cmp #PushableMask
-        bcc moveCancel; If it is not pushable, we cannot move into the hole
+        bcs +
+        jmp moveCancel; If it is not pushable, we cannot move into the hole
 
         ; Head was a pushable, so it should go in the hole (remove both)
 
 	; Test if head was a goal
-        and #TileIndexMask
++       and #TileIndexMask
         cmp #TileGoal_Index
-        beq removeGoal
+        bne +
+        jmp removeGoal
 
-        lda $03
++       lda CurrentTile
         jsr undoSaveTile
-        ; swaap HL and DE, ($03 is HL, $04 is DE)
-        ldx $04
-        lda $03
-        sta $04
+        ; swap CurrentTile and HeadTile
+        ldx HeadTile
+        lda CurrentTile
+        sta HeadTile
         txa
-        sta $03
+        sta CurrentTile
         jsr undoSaveTile
         lda #(TileEmpty_Index | NeedsRedrawMask)
         sta Level, y
+        sta HeadTile
         jmp movePerform
-
-removeGoal:
-        ; TODO
-        rts
 
 moveFoundPushable:
         ; it's a pushable, so push it (^;
+        lda CurrentTile
 	pha
-	inc $02 ; increment position count
+	inc StackDepth
 	jmp moveSearchLoop
 
 moveFoundSolid:
@@ -282,15 +276,15 @@ moveFoundSolid:
 	;
 perpArrowSearchLoop:
         pla
-        dec $02
-        sta $03 ; update HL position to the popped value
+        sta CurrentTile ; update current tile to the popped value
+        dec StackDepth
         beq setCarryAndReturn
 
         ; We must check if this is a real position or a search direction change
         cmp #$ff
         bne notDirectionChangeSentinel
         pla
-        dec $02
+        dec StackDepth
         sta PlayerMoveDir ; update the direction of movement to the popped value
         jmp perpArrowSearchLoop
 
@@ -305,24 +299,22 @@ notDirectionChangeSentinel:
         jsr removeGoal
         jmp movePerform
 
-setCarryAndReturn:
-        sec
-        rts
-
 notGoal:
         eor #TileRightArrow_Index
         cmp #$04
         bcc perpArrowSearchLoop
 
         ; At this point, it is an arrow
-        sta $05 ; $05 = Arrow direction
+        sta ArrowDirection
+
+        ; If along the same movement axis, keep looping
         eor PlayerMoveDir
         clc
         ror
         bcc perpArrowSearchLoop ; If the arrow is not perpendicular, continue searching
 
         ; The found arrow is perpendicular
-        ldy $03
+        ldy CurrentTile
         lda Level, y
         ora ActiveTileMask | NeedsRedrawMask
         sta Level, y
@@ -330,12 +322,12 @@ notGoal:
         ; Push search direction and sentinel onto the stack
         lda PlayerMoveDir
         pha
-        inc $02
+        inc StackDepth
         lda #$ff
         pha
-        inc $02
+        inc StackDepth
 
-        lda $05
+        lda ArrowDirection
         sta PlayerMoveDir ; update the direction of movement to the found arrow's direction
 
         jmp moveSearchLoop
@@ -343,19 +335,22 @@ notGoal:
 moveCancel:
       	; Cancel the move, since we found a solid
         ; Unwind the stack
-        ldy $03
+        ldy CurrentTile
         lda Level, y
         and InactiveTileMask
         ora NeedsRedrawMask
         sta Level, y
 
         pla
-        dec $02
+        dec StackDepth
         bne moveCancel
-        jmp setCarryAndReturn
 
+setCarryAndReturn:
+        sec
+        rts
+
+; TODO WE ARE HERE!
 movePerform:
-skipPlayerPosUpdate:
 tileDidntChange:
 decrementAndLoop:
         ; TODO
@@ -395,6 +390,9 @@ undoSaveTile:
         pla
         rts
 
+removeGoal:
+        ; TODO
+        rts
 
 openDoorsLoop:
 notClosedDoor:
@@ -472,14 +470,6 @@ loopUndoCLear:
         ; TODO
         rts
 
-initLeveLVariables:
-loopLevelVariables:
-notTarget:
-notThePlayer:
-endLevelVariables:
-        ; TODO
-        rts
-
 undo:
 undoLoop:
 undoEnd:
@@ -495,7 +485,7 @@ readInput:
 
         cmp #KEY_RESTART_LEVEL
         bne notRestart
-        lda CurrentLevelIndex
+        lda CurrentLevelIndex ; TODO This is undefined before starting the game, so we need to handle that case
         jsr gotoLevel
         jsr draw
         sec
@@ -541,7 +531,7 @@ noInput:
         rts
 
 gameInit:
-        lda #$00
+        lda #$04
         sta CurrentLevelIndex
         jsr gotoLevel
         jsr draw
@@ -556,10 +546,28 @@ draw:
         ldy #00
         sty $03
         sty $04
+
+        ; reset level variables
+        sty MissingTargets
+        sty PlayerPos
 nextRow:
         ; offset in row
         ldx #00
 nextTile:
+	; While we are looping over every tile in the level, keep track of
+	; - PlayerPosition
+	; - Missing shooting targets
+        lda Level,y
+        and #TileIndexMask
+        cmp #TileGoal_Index
+        bne notTarget
+        inc MissingTargets
+notTarget:
+        eor #TileBoxKidRight_Index
+        cmp #$04
+        bcs notThePlayer
+        sty PlayerPos
+notThePlayer:
         ; Check dirty flag
         lda Level,y
         and #NeedsRedrawMask
@@ -868,6 +876,11 @@ CurrentLevelIndex: !byte 0
 ; buffers
 Level = (CurrentLevelIndex + $ff) & $ff00
 LevelEnd = Level + 8*24
+
+ArrowDirection = Level + $0100 - 6
+StackDepth = Level + $0100 - 5
+CurrentTile = Level + $0100 - 4
+HeadTile = Level + $0100 - 3
 
 UndoEntryCount = Level + $0100 - 2
 UndoBufferAt = Level + $0100 - 1
