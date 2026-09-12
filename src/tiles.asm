@@ -10,8 +10,8 @@ TileUpArrow_Index = 5
 TileLeftArrow_Index = 6
 TileDownArrow_Index = 7
 TileBoxKidRight_Index = 8
-TileBoxKidLeft_Index = 9
-TileBoxKidUp_Index = 10
+TileBoxKidUp_Index = 9
+TileBoxKidLeft_Index = 10
 TileBoxKidDown_Index = 11
 TileDoorOpen_Index = 12
 TileDoorClosed_Index = 13
@@ -173,25 +173,6 @@ TileCrateStone_Index = 15
 
 ;---------------------------------------
 ;TileBoxKidRight
-    !byte %01111110
-    !byte %10000001
-    !byte %11111111
-    !byte %11001001
-    !byte %11001011
-    !byte %10000001
-    !byte %01111110
-    !byte %00100100
-    !byte %00000000
-    !byte %00000000
-    !byte %00000000
-    !byte %00000000
-    !byte %10000000
-    !byte %00000000
-    !byte %00000000
-    !byte %00000000
-
-;---------------------------------------
-;TileBoxKidLeft
     !byte %00011111
     !byte %00100000
     !byte %00111111
@@ -225,6 +206,25 @@ TileCrateStone_Index = 15
     !byte %10000000
     !byte %11000000
     !byte %10000000
+    !byte %00000000
+    !byte %00000000
+
+;---------------------------------------
+;TileBoxKidLeft
+    !byte %01111110
+    !byte %10000001
+    !byte %11111111
+    !byte %11001001
+    !byte %11001011
+    !byte %10000001
+    !byte %01111110
+    !byte %00100100
+    !byte %00000000
+    !byte %00000000
+    !byte %00000000
+    !byte %00000000
+    !byte %10000000
+    !byte %00000000
     !byte %00000000
     !byte %00000000
 
@@ -479,25 +479,6 @@ TileCrateStone_Index = 15
 
 ;---------------------------------------
 ;TileBoxKidRight
-    !byte %00011111
-    !byte %00100000
-    !byte %00111111
-    !byte %00110010
-    !byte %00110010
-    !byte %00100000
-    !byte %00011111
-    !byte %00001001
-    !byte %10000000
-    !byte %01000000
-    !byte %11000000
-    !byte %01000000
-    !byte %11100000
-    !byte %01000000
-    !byte %10000000
-    !byte %00000000
-
-;---------------------------------------
-;TileBoxKidLeft
     !byte %00000111
     !byte %00001000
     !byte %00001111
@@ -533,6 +514,25 @@ TileCrateStone_Index = 15
     !byte %00100000
     !byte %11000000
     !byte %10000000
+
+;---------------------------------------
+;TileBoxKidLeft
+    !byte %00011111
+    !byte %00100000
+    !byte %00111111
+    !byte %00110010
+    !byte %00110010
+    !byte %00100000
+    !byte %00011111
+    !byte %00001001
+    !byte %10000000
+    !byte %01000000
+    !byte %11000000
+    !byte %01000000
+    !byte %11100000
+    !byte %01000000
+    !byte %10000000
+    !byte %00000000
 
 ;---------------------------------------
 ;TileBoxKidDown
@@ -785,25 +785,6 @@ TileCrateStone_Index = 15
 
 ;---------------------------------------
 ;TileBoxKidRight
-    !byte %00000111
-    !byte %00001000
-    !byte %00001111
-    !byte %00001100
-    !byte %00001100
-    !byte %00001000
-    !byte %00000111
-    !byte %00000010
-    !byte %11100000
-    !byte %00010000
-    !byte %11110000
-    !byte %10010000
-    !byte %10111000
-    !byte %00010000
-    !byte %11100000
-    !byte %01000000
-
-;---------------------------------------
-;TileBoxKidLeft
     !byte %00000001
     !byte %00000010
     !byte %00000011
@@ -839,6 +820,25 @@ TileCrateStone_Index = 15
     !byte %00001000
     !byte %11110000
     !byte %00100000
+
+;---------------------------------------
+;TileBoxKidLeft
+    !byte %00000111
+    !byte %00001000
+    !byte %00001111
+    !byte %00001100
+    !byte %00001100
+    !byte %00001000
+    !byte %00000111
+    !byte %00000010
+    !byte %11100000
+    !byte %00010000
+    !byte %11110000
+    !byte %10010000
+    !byte %10111000
+    !byte %00010000
+    !byte %11100000
+    !byte %01000000
 
 ;---------------------------------------
 ;TileBoxKidDown
@@ -1091,25 +1091,6 @@ TileCrateStone_Index = 15
 
 ;---------------------------------------
 ;TileBoxKidRight
-    !byte %00000001
-    !byte %00000010
-    !byte %00000011
-    !byte %00000011
-    !byte %00000011
-    !byte %00000010
-    !byte %00000001
-    !byte %00000000
-    !byte %11111000
-    !byte %00000100
-    !byte %11111100
-    !byte %00100100
-    !byte %00101110
-    !byte %00000100
-    !byte %11111000
-    !byte %10010000
-
-;---------------------------------------
-;TileBoxKidLeft
     !byte %00000000
     !byte %00000000
     !byte %00000000
@@ -1145,6 +1126,25 @@ TileCrateStone_Index = 15
     !byte %00000010
     !byte %11111100
     !byte %01001000
+
+;---------------------------------------
+;TileBoxKidLeft
+    !byte %00000001
+    !byte %00000010
+    !byte %00000011
+    !byte %00000011
+    !byte %00000011
+    !byte %00000010
+    !byte %00000001
+    !byte %00000000
+    !byte %11111000
+    !byte %00000100
+    !byte %11111100
+    !byte %00100100
+    !byte %00101110
+    !byte %00000100
+    !byte %11111000
+    !byte %10010000
 
 ;---------------------------------------
 ;TileBoxKidDown

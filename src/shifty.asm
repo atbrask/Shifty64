@@ -30,21 +30,21 @@ KEY_RIGHT         = $44 ; D
 ;
 ; How tiles are stored in the loaded level:
 ;
-PushableMask      = 0b10000000 ; bit 7 of tile
-NeedsRedrawMask   = 0b01000000 ; bit 6 of tile
-ActiveTileMask    = 0b00100000 ; bit 5 of tile
-InactiveTileMask  = 0b11011111 ; bit 5 of tile
-TileIndexMask     = 0b00011111 ; bits 0-4 of tile (This port assumes a max of 16 tile types due to memory layout)
+PushableMask      = %10000000 ; bit 7 of tile
+NeedsRedrawMask   = %01000000 ; bit 6 of tile
+ActiveTileMask    = %00100000 ; bit 5 of tile
+InactiveTileMask  = %11011111 ; bit 5 of tile
+TileIndexMask     = %00011111 ; bits 0-4 of tile (This port assumes a max of 16 tile types due to memory layout)
 
 ; Direction encoding:
 ; bit 0: Axis (0: X, 1: Y)
 ; bit 1: Sign of direction along axis (0: positive, 1: negative)
-DirectionSignBit  = 0b00000010
-DirectionAxisBit  = 0b00000001
-DirectionRight    = 0b00000000
-DirectionUp       = 0b00000001
-DirectionLeft     = 0b00000010
-DirectionDown     = 0b00000011
+DirectionSignBit  = %00000010
+DirectionAxisBit  = %00000001
+DirectionRight    = %00000000
+DirectionUp       = %00000001
+DirectionLeft     = %00000010
+DirectionDown     = %00000011
 
 !cpu 6502
 *=$0801   ; Starting Address
@@ -349,18 +349,103 @@ setCarryAndReturn:
         sec
         rts
 
-; TODO WE ARE HERE!
 movePerform:
+        pla
+        sta HeadTile
+        cmp #$ff ; Detect search direction sentinel
+        beq decrementAndLoop
+
+        ; HeadTile = closest tile from player (from the stack)
+        ; CurrentTile = furthest tile from player
+
+        ; Write from closest pos (HeadTile) to furthest pos (CurrentTile)
+        tay
+        lda Level, y
+        ldy CurrentTile
+        cmp Level, y
+        beq tileDidntChange
+
+        jsr undoSaveTile
+
+        ora #NeedsRedrawMask
+        and #InactiveTileMask
+        ldy CurrentTile
+        sta Level, y
+
 tileDidntChange:
+        lda CurrentTile
+        ldx HeadTile
+        sta HeadTile
+        stx CurrentTile
+
 decrementAndLoop:
-        ; TODO
+        ; Decrement and loop until B hits 0
+        dec StackDepth
+        bne movePerform
+        
+       	; [HL] = original player position before the move
+	; Clear foreground tile on the starting position, the player just moved away from this tile.
+        jsr undoSaveTile
+        ldy CurrentTile
+        lda #(TileEmpty_Index | NeedsRedrawMask)
+        sta Level, y
+
+        ; Update player facing direction
+        ldy HeadTile
+        lda Level, y
+        and #%11111100
+        ora PlayerMoveDir
+        sta Level, y
+
+        jsr undoEndMoveRecord
+        clc ; clear carry bit to indicate that the move was performed successfully
         rts
 
 undoEndMoveRecord:
+        ldy UndoBufferAt
+        lda UndoEntryCount
+        sta UndoBuffer, y
+        iny
+        lda #$ff
+        sta UndoBuffer, y
+        iny
+        sty UndoBufferAt
+
+        ; Search ahead to see if we truncated the oldest move record,
+	; and if we did, disable that move record by clearing the FF sentinel
+        lda #$00
+        sta SearchDistance
+        lda UndoBuffer, y
 searchSentinel:
+        cmp #$ff
+        beq foundSentinel
+        inc SearchDistance
+        beq oldestRecordNotTruncated
+        iny
+        lda UndoBuffer, y
+        jmp searchSentinel
+
 foundSentinel:
+        ; points at oldest move record sentinel
+	dey
+	; points at oldest move record entry count
+
+        ; If oldest move record entry count exceeds the search distance
+        lda UndoBuffer, y
+        clc
+        adc UndoBuffer, y
+        cmp SearchDistance
+        bcs oldestRecordNotTruncated
+
+        ; The oldest record has been truncated, so we must clear its
+	; sentinel to 0 to disable it.
+        iny
+        lda #$00
+        sta UndoBuffer, y
+
 oldestRecordNotTruncated:
-        ; TODO
+        lda #$00
+        sta UndoEntryCount
         rts
 
 ; A = tile offset
@@ -463,7 +548,6 @@ writeRun:
         ; Check if done
         cmp #$c0
         bcc readCompressed
-        ; TODO Call InitLevelVariables and undo init
 
 undoClear:
 loopUndoCLear:
@@ -505,24 +589,28 @@ notUndo:
         cmp #KEY_UP
         bne notUp
         lda #DirectionUp
+        sta PlayerMoveDir
         clc
         rts
 notUp:
         cmp #KEY_DOWN
         bne notDown
         lda #DirectionDown
+        sta PlayerMoveDir
         clc
         rts
 notDown:
         cmp #KEY_LEFT
         bne notLeft
         lda #DirectionLeft
+        sta PlayerMoveDir
         clc
         rts
 notLeft:
         cmp #KEY_RIGHT
         bne noInput
         lda #DirectionRight
+        sta PlayerMoveDir
         clc
         rts
 noInput:
@@ -531,7 +619,7 @@ noInput:
         rts
 
 gameInit:
-        lda #$04
+        lda #$00
         sta CurrentLevelIndex
         jsr gotoLevel
         jsr draw
@@ -873,14 +961,15 @@ MissingTargets: !byte 0
 
 CurrentLevelIndex: !byte 0
 
+SearchDistance: !byte 0
+ArrowDirection: !byte 0
+StackDepth: !byte 0
+CurrentTile: !byte 0
+HeadTile: !byte 0
+
 ; buffers
 Level = (CurrentLevelIndex + $ff) & $ff00
 LevelEnd = Level + 8*24
-
-ArrowDirection = Level + $0100 - 6
-StackDepth = Level + $0100 - 5
-CurrentTile = Level + $0100 - 4
-HeadTile = Level + $0100 - 3
 
 UndoEntryCount = Level + $0100 - 2
 UndoBufferAt = Level + $0100 - 1
