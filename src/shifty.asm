@@ -302,7 +302,7 @@ notDirectionChangeSentinel:
 notGoal:
         eor #TileRightArrow_Index
         cmp #$04
-        bcc perpArrowSearchLoop
+        bcs perpArrowSearchLoop
 
         ; At this point, it is an arrow
         sta ArrowDirection
