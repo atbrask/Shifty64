@@ -521,14 +521,17 @@ readCompressed:
         inx
         stx $ff
 
-        ; Read tile type and set redraw flag
+        ; Read tile type
         lda ($fb),Y
         and #%00011111
-        ora #NeedsRedrawMask
 
         ; Compressed data offset += 1
         iny
         sty $fd
+
+        ; Apply tile properties
+        tay
+        lda TileInfoFromTileIndexMap, y
 
         ; Load decompressed data offset and write to screen buffer
         ; X is already the number of bytes to write        
