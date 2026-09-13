@@ -33,7 +33,7 @@ KEY_RIGHT         = $44 ; D
 PushableMask      = %10000000 ; bit 7 of tile
 NeedsRedrawMask   = %01000000 ; bit 6 of tile
 ActiveTileMask    = %00100000 ; bit 5 of tile
-InactiveTileMask  = %11011111 ; bit 5 of tile
+InactiveTileMask  = %11011111 ; everything except bit 5 of tile
 TileIndexMask     = %00011111 ; bits 0-4 of tile (This port assumes a max of 16 tile types due to memory layout)
 
 ; Direction encoding:
@@ -220,6 +220,7 @@ moveFoundHole:
 skipDirectionChangeSentinelsLoop:
         ; We need to follow the arrows
         pla
+        sta HeadTile
         dec StackDepth
         bne +
         jmp setCarryAndReturn
@@ -249,12 +250,14 @@ skipDirectionChangeSentinelsLoop:
         ldx HeadTile
         lda CurrentTile
         sta HeadTile
+        stx CurrentTile
         txa
-        sta CurrentTile
         jsr undoSaveTile
         lda #(TileEmpty_Index | NeedsRedrawMask)
+        ldy HeadTile
         sta Level, y
-        sta HeadTile
+        ldy CurrentTile
+        sta Level, y
         jmp movePerform
 
 moveFoundPushable:
@@ -322,6 +325,7 @@ notGoal:
         ; Push search direction and sentinel onto the stack
         lda PlayerMoveDir
         pha
+        sta HeadTile
         inc StackDepth
         lda #$ff
         pha
@@ -342,6 +346,7 @@ moveCancel:
         sta Level, y
 
         pla
+        sta CurrentTile
         dec StackDepth
         bne moveCancel
 
@@ -449,9 +454,11 @@ oldestRecordNotTruncated:
         rts
 
 ; A = tile offset
-; Clobbers y
 undoSaveTile:
         ; preserve A
+        pha
+        ; preserve Y
+        tya
         pha
     
         ; save tile offset
@@ -471,18 +478,38 @@ undoSaveTile:
         ; Update the count of entries in the undo buffer
         inc UndoEntryCount
 
-        ; restore A and return
+        ; restore Y, A, and return
+        pla
+        tay
         pla
         rts
 
 removeGoal:
-        ; TODO
-        rts
+        jsr undoSaveTile
+        ldy CurrentTile
+        lda #TileEmpty_Index
+        sta Level, y
 
+        ; Decrease number of targets and check if it was the last one
+        dec MissingTargets
+        bne end
+
+        ; If it was the last target, open all doors
+        ldy #$c0
 openDoorsLoop:
+        dey
+        lda Level, y
+        and #TileIndexMask
+        cmp #TileDoorClosed_Index
+        bne notClosedDoor
+        ; Open the closed door
+        jsr undoSaveTile
+        lda #(TileDoorOpen_Index | NeedsRedrawMask)
+        sta Level, y
 notClosedDoor:
+        cpy #$00
+        bne openDoorsLoop
 end:
-        ; TODO
         rts
 
         ;Level index in A
