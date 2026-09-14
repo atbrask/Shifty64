@@ -242,7 +242,7 @@ skipDirectionChangeSentinelsLoop:
 +       and #TileIndexMask
         cmp #TileGoal_Index
         bne +
-        jmp removeGoal
+        jsr removeGoal
 
 +       lda CurrentTile
         jsr undoSaveTile
