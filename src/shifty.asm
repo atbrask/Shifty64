@@ -319,14 +319,10 @@ notGoal:
         ; The found arrow is perpendicular
         ldy CurrentTile
         lda Level, y
-        ora ActiveTileMask | NeedsRedrawMask
+        ora #(ActiveTileMask | NeedsRedrawMask)
         sta Level, y
 
-        ; Push search direction and sentinel onto the stack
-        lda PlayerMoveDir
-        pha
-        sta HeadTile
-        inc StackDepth
+        ; Push sentinel onto the stack
         lda #$ff
         pha
         inc StackDepth
