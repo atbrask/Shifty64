@@ -287,7 +287,6 @@ perpArrowSearchLoop:
         cmp #$ff
         bne notDirectionChangeSentinel
         pla
-        dec StackDepth
         sta PlayerMoveDir ; update the direction of movement to the popped value
         jmp perpArrowSearchLoop
 
@@ -322,7 +321,9 @@ notGoal:
         ora #(ActiveTileMask | NeedsRedrawMask)
         sta Level, y
 
-        ; Push sentinel onto the stack
+        ; Push search direction and sentinel onto the stack
+        lda PlayerMoveDir
+        pha
         lda #$ff
         pha
         inc StackDepth
@@ -354,13 +355,15 @@ movePerform:
         pla
         sta HeadTile
         cmp #$ff ; Detect search direction sentinel
-        beq decrementAndLoop
+        bne +
+        pla
+        jmp decrementAndLoop
 
         ; HeadTile = closest tile from player (from the stack)
         ; CurrentTile = furthest tile from player
 
         ; Write from closest pos (HeadTile) to furthest pos (CurrentTile)
-        tay
++       tay
         lda Level, y
         ldy CurrentTile
         cmp Level, y
