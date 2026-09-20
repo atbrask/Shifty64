@@ -243,15 +243,13 @@ skipDirectionChangeSentinelsLoop:
         cmp #TileGoal_Index
         bne +
         jsr removeGoal
-
-+       lda CurrentTile
++       ldy CurrentTile
         jsr undoSaveTile
         ; swap CurrentTile and HeadTile
-        ldx HeadTile
+        ldy HeadTile
         lda CurrentTile
         sta HeadTile
-        stx CurrentTile
-        txa
+        sty CurrentTile
         jsr undoSaveTile
         lda #(TileEmpty_Index | NeedsRedrawMask)
         ldy HeadTile
@@ -368,9 +366,7 @@ movePerform:
         ldy CurrentTile
         cmp Level, y
         beq tileDidntChange
-
         jsr undoSaveTile
-
         ora #NeedsRedrawMask
         and #InactiveTileMask
         ldy CurrentTile
@@ -389,8 +385,8 @@ decrementAndLoop:
         
        	; [HL] = original player position before the move
 	; Clear foreground tile on the starting position, the player just moved away from this tile.
-        jsr undoSaveTile
         ldy CurrentTile
+        jsr undoSaveTile
         lda #(TileEmpty_Index | NeedsRedrawMask)
         sta Level, y
 
@@ -439,7 +435,7 @@ foundSentinel:
         clc
         adc UndoBuffer, y
         cmp SearchDistance
-        bcs oldestRecordNotTruncated
+        bcc oldestRecordNotTruncated
 
         ; The oldest record has been truncated, so we must clear its
 	; sentinel to 0 to disable it.
@@ -452,14 +448,13 @@ oldestRecordNotTruncated:
         sta UndoEntryCount
         rts
 
-; A = tile offset
+; Y = tile offset
 undoSaveTile:
         ; preserve A
-        pha
+        sta $ff
         ; preserve Y
+        sty $fe
         tya
-        pha
-    
         ; save tile offset
         ldy UndoBufferAt
         sta UndoBuffer, y
@@ -478,14 +473,13 @@ undoSaveTile:
         inc UndoEntryCount
 
         ; restore Y, A, and return
-        pla
-        tay
-        pla
+        lda $ff
+        ldy $fe
         rts
 
 removeGoal:
-        jsr undoSaveTile
         ldy CurrentTile
+        jsr undoSaveTile
         lda #TileEmpty_Index
         sta Level, y
 
@@ -579,14 +573,47 @@ writeRun:
         bcc readCompressed
 
 undoClear:
-loopUndoCLear:
-        ; TODO
+        lda #$00
+        sta UndoEntryCount
+        sta UndoBufferAt
+        ldy #$00
+loopUndoClear:
+        sta UndoBuffer, y
+        dey
+        bne loopUndoClear
         rts
 
 undo:
+        ldy UndoBufferAt
+        dey
+        lda UndoBuffer, y
+        cmp #$ff
+        bne undoEnd ; Undo buffer empty
+
+        lda #$00
+        sta UndoBuffer, y ; Clear move record being un-done
+
+        dey
+        lda UndoBuffer, y ; entry count
+        sta $fe
 undoLoop:
+        dey
+        lda UndoBuffer, y ; tile info
+        ora #NeedsRedrawMask
+        tax
+        dey
+        sty $ff
+        lda UndoBuffer, y ; tile pos
+        tay
+        txa
+        sta Level, y
+        ldy $ff
+
+        dec $fe
+        bne undoLoop
+
+        sty UndoBufferAt
 undoEnd:
-        ; TODO
         rts
 
 
@@ -721,9 +748,9 @@ done:
 ;------------------------------------------------------------------------------
 prepareScreen:
         ; Set border and background
-        lda #$0e
+        lda #$00
         sta VIC_BORDER_COLOR
-        lda #$06
+        lda #$00
         sta VIC_BACK1_COLOR
 
         ;no visible sprites
@@ -751,7 +778,7 @@ clearBitmap:
         sta $fd
         lda #>COLOR_BUFFER
         sta $fe
-        lda #$e6 ; Screen colors, e = light blue, 6 = dark blue
+        lda #$0c ; Screen colors: 4b foreground + 4b background
         ldy #$00 ; byte counter
         ldx #$04 ; 4 pages x 256 bytes = 1 KB
 clearColors:
