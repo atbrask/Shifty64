@@ -172,15 +172,15 @@ moveSearchLoop:
 
         and #TileIndexMask
 
+        cmp #TileDoorOpen_Index
+        beq moveFoundOpenDoor
+
         ; Check for solid tiles
         cmp #TileWallBrick_Index
         beq moveFoundSolid
 
         cmp #TileDoorClosed_Index
         beq moveFoundSolid
-
-        cmp #TileDoorOpen_Index
-        beq moveFoundOpenDoor
 
         ; Check for hole
         cmp #TileHole_Index
@@ -225,12 +225,14 @@ skipDirectionChangeSentinelsLoop:
         bne +
         jmp setCarryAndReturn
 +       cmp #$ff
-        beq skipDirectionChangeSentinelsLoop
+        bne +
+        pla ; Remember that $ff implies a second stack entry to discard
+        jmp skipDirectionChangeSentinelsLoop
         
         ; Now we are on the first non-direction change tile
 	; If it is pushable, it should go in the hole
 
-        tay
++       tay
         lda Level, y
         cmp #PushableMask
         bcs +
@@ -778,7 +780,7 @@ clearBitmap:
         sta $fd
         lda #>COLOR_BUFFER
         sta $fe
-        lda #$0c ; Screen colors: 4b foreground + 4b background
+        lda #$00 ; Screen colors: 4b foreground + 4b background
         ldy #$00 ; byte counter
         ldx #$04 ; 4 pages x 256 bytes = 1 KB
 clearColors:
