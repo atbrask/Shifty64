@@ -19,6 +19,6 @@ This is pretty much an example of how not to make a game for the C64:
 - There is no sound or music.
 - There are no sprites.
 - There are no colors. Only two grays.
-- The controls are WASD for movement, Z for undo, R for restarting the current level, and q for quitting to the title screen. No joystik support at this point.
+- The controls are WASD for movement, Z for undo, R for restarting the current level, and Q for quitting to the title screen. No joystick support at this point.
 - Only a small section of the screen is used (to match the NEC PC-8201A original).
 - All graphical tiles are 10x8 pixels, which maps terribly to the C64 hardware, so the game runs in hi-res graphics mode. 
