@@ -750,9 +750,9 @@ done:
 ;------------------------------------------------------------------------------
 prepareScreen:
         ; Set border and background
-        lda #$00
+        lda #$0e
         sta VIC_BORDER_COLOR
-        lda #$00
+        lda #$06
         sta VIC_BACK1_COLOR
 
         ;no visible sprites
@@ -780,7 +780,7 @@ clearBitmap:
         sta $fd
         lda #>COLOR_BUFFER
         sta $fe
-        lda #$00 ; Screen colors: 4b foreground + 4b background
+        lda #$e6 ; Screen colors: 4b foreground + 4b background
         ldy #$00 ; byte counter
         ldx #$04 ; 4 pages x 256 bytes = 1 KB
 clearColors:
